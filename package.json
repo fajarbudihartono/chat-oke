@@ -1,14 +1,17 @@
 {
-  "name": "chat",
+  "name": "chat-oke",
   "version": "1.0.0",
+  "description": "Aplikasi chat real-time dengan login dan database MySQL",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["chat", "socket.io", "nodejs", "mysql"],
+  "author": "Fajar Budi Hartono",
   "license": "ISC",
-  "description": "",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
