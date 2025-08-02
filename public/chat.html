@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Yuk Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    h2 {
+      text-align: center;
+      color: #1453e7;
+      margin-bottom: 10px;
+    }
+    #user-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 15px auto;
+      gap: 10px;
+      max-width: 600px;
+    }
+    #userPhoto {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #ccc;
+    }
+    #usernameDisplay {
+      font-weight: bold;
+      color: #1414db;
+      font-size: 16px;
+    }
+    #messages {
+      list-style-type: none;
+      padding: 0;
+      margin: 0 auto 20px auto;
+      max-width: 600px;
+      height: 300px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+    }
+    #messages li {
+      padding: 10px 15px;
+      border-bottom: 1px solid #181717;
+      word-wrap: break-word;
+    }
+    #messages li:last-child {
+      border-bottom: none;
+    }
+    form {
+      display: flex;
+      justify-content: center;
+      max-width: 600px;
+      margin: 0 auto;
+      gap: 10px;
+    }
+    #msg {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007BFF;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #activeUsers {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #160303;
+    }
+    @media (max-width: 600px) {
+      #messages { height: 250px; }
+      form { flex-direction: column; align-items: stretch; }
+      #msg, button { width: 100%; }
+      #user-info { flex-direction: column; }
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    .blinking { animation: blink 1s infinite; }
+
+    .marquee {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+  margin-bottom: 15px;
+}
+.marquee span {
+  display: inline-block;
+  padding-left: 100%;
+  animation: marquee 10s linear infinite;
+  font-weight: bold;
+  color: #e70f0f;
+}
+@keyframes marquee {
+  0%   { transform: translate(0, 0); }
+  100% { transform: translate(-100%, 0); }
+}
+
+  </style>
+</head>
+<body>
+  <h2>Yuk Chat</h2>
+<div class="marquee">
+  <span>Ayoo chatting ngobrol seru</span>
+</div>
+
+  <div id="activeUsers"></div>
+
+  <div id="user-info">
+    <img id="userPhoto" src="" alt="Foto Profil">
+    <span id="usernameDisplay">Memuat...</span>
+  </div>
+
+  <ul id="messages"></ul>
+
+  <form id="form">
+    <input id="msg" autocomplete="off" placeholder="Ketik pesan..." />
+    <button type="submit">Kirim</button>
+  </form>
+
+  <div style="text-align:center; margin-top:10px;">
+    <button type="button" onclick="window.location.href='logout.html'">Logout</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('user');
+    if (!username) {
+      alert("Akses tidak sah. Silakan login terlebih dahulu.");
+      window.location.href = "/login.html";
+    }
+
+    document.getElementById('usernameDisplay').textContent = username;
+
+    fetch('/api/userinfo?username=' + encodeURIComponent(username))
+      .then(res => res.json())
+      .then(data => {
+        if (data.foto) {
+          document.getElementById('userPhoto').src = data.foto;
+        }
+      })
+      .catch(err => console.error('Gagal mengambil foto profil:', err));
+
+    const socket = io();
+    socket.emit('user connected', username);
+    socket.emit('join user room', username);
+
+    const form = document.getElementById('form');
+    const input = document.getElementById('msg');
+    const messages = document.getElementById('messages');
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const msg = input.value.trim();
+      if (msg) {
+        socket.emit('chat message', { username, message: msg });
+        input.value = '';
+      }
+    });
+
+    socket.on('chat message', ({ username, message }) => {
+      const item = document.createElement('li');
+      item.textContent = `${username}: ${message}`;
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
+    });
+
+    socket.on('active users', async (userListAktif) => {
+      const container = document.getElementById('activeUsers');
+      container.innerHTML = '<strong>Daftar User:</strong><br>';
+      try {
+        const allRes = await fetch('/api/allusers');
+        const semuaUser = await allRes.json();
+        const aktifLower = userListAktif.map(u => u.toLowerCase());
+
+        const userHTML = await Promise.all(semuaUser.map(async (user) => {
+          const warna = aktifLower.includes(user.toLowerCase()) ? 'red' : 'black';
+
+          if (user.toLowerCase() === username.toLowerCase()) return ''; // Jangan tampilkan diri sendiri
+
+          try {
+            const res = await fetch('/api/userinfo?username=' + encodeURIComponent(user));
+            const data = await res.json();
+            const foto = data.foto || '/images/profiles/default.jpg';
+
+            return `
+              <div style="display: inline-block; margin: 5px; text-align: center;">
+                <a href="private_chat.html?from=${encodeURIComponent(username)}&to=${encodeURIComponent(user)}" style="text-decoration: none;">
+                  <img src="${foto}" style="width:40px; height:40px; border-radius:50%; border:1px solid #ccc;"><br>
+                  <span class="${warna === 'red' ? 'blinking' : ''}" style="font-size: 12px; color: ${warna}; font-weight: bold;">${user}</span>
+                </a>
+              </div>
+            `;
+          } catch {
+            return `<div style="color:${warna};">${user}</div>`;
+          }
+        }));
+
+        container.innerHTML += userHTML.join('');
+      } catch (err) {
+        container.textContent = 'Gagal memuat daftar user';
+        console.error(err);
+      }
+    });
+
+    socket.on('notify message', ({ from, to }) => {
+      if (window.location.pathname !== '/private_chat.html') {
+        const target = (username === from) ? to : from;
+        window.location.href = `/private_chat.html?from=${username}&to=${target}`;
+      }
+    });
+  </script>
+</body>
+</html>

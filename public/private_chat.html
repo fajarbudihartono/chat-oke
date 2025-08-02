@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Private Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      padding: 20px;
+    }
+
+    h3 {
+      text-align: center;
+      color: #007bff;
+      margin-bottom: 10px;
+    }
+
+    .user-info {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .user-box {
+      text-align: center;
+    }
+
+    .user-box img {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 1px solid #ccc;
+      object-fit: cover;
+    }
+
+    .user-box span {
+      display: block;
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    #chatBox {
+      height: 300px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      background: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    form {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    #message {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 10px 15px;
+      background: #007bff;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h3>Private Chat</h3>
+
+  <!-- Info Pengguna -->
+  <div class="user-info">
+    <div class="user-box" id="fromUser">
+      <img src="" alt="Foto From">
+      <span>From</span>
+    </div>
+    <div class="user-box" id="toUser">
+      <img src="" alt="Foto To">
+      <span>To</span>
+    </div>
+  </div>
+
+  <!-- Chat Box -->
+  <div id="chatBox"></div>
+
+  <!-- Form Chat -->
+  <form id="form">
+    <input type="text" id="message" placeholder="Ketik pesan..." autocomplete="off">
+    <button type="submit">Kirim</button>
+    <a href="logout.html"><button type="button">Logout</button></a>
+  </form>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const urlParams = new URLSearchParams(window.location.search);
+    const from = urlParams.get('from');
+    const to = urlParams.get('to');
+    const chatBox = document.getElementById('chatBox');
+    const form = document.getElementById('form');
+    const input = document.getElementById('message');
+
+    const room = [from, to].sort().join('-');
+    socket.emit('join private', room);
+
+    // HANYA mengirim pesan ke server, tanpa menampilkan langsung
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input.value.trim()) {
+        socket.emit('private message', {
+          room,
+          from,
+          to,
+          message: input.value.trim()
+        });
+        input.value = ''; // Bersihkan input setelah dikirim
+      }
+    });
+
+    // Menampilkan pesan saat diterima dari server
+    socket.on('private message', ({ from, message }) => {
+      chatBox.innerHTML += `<div><strong>${from}:</strong> ${message}</div>`;
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Tampilkan nama & foto pengguna "from" dan "to"
+    async function tampilkanUserInfo(id, username) {
+      try {
+        const res = await fetch(`/api/userinfo?username=${encodeURIComponent(username)}`);
+        const data = await res.json();
+        const box = document.getElementById(id);
+        box.querySelector('img').src = data.foto || '/images/profiles/default.jpg';
+        box.querySelector('span').textContent = username;
+
+        if (id === 'fromUser') {
+          box.querySelector('span').style.color = 'red'; // Nama host (from) jadi merah
+        }
+      } catch (err) {
+        console.error('Gagal ambil data pengguna:', username, err);
+      }
+    }
+
+    tampilkanUserInfo('fromUser', from);
+    tampilkanUserInfo('toUser', to);
+  </script>
+</body>
+</html>
